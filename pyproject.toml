@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mlops-playground"
+version = "0.1.0"
+description = "Daily order forecasting and feature preparation"
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "numpy",
+    "pandas",
+    "scikit-learn",
+]
+
+[dependency-groups]
+notebook = [
+    "ipykernel",
+    "matplotlib",
+    "pyarrow",
+    "scipy",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mlops_playground"]

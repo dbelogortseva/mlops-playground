@@ -6,3 +6,5 @@ dist/
 build/
 *.egg-info/
 .verification/
+.pytest_cache/
+pytest-cache-files-*/

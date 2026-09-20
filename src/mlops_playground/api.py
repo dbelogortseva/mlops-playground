@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from datetime import datetime, timezone
 import logging
 import math
 import os
@@ -14,8 +15,10 @@ import sklearn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.concurrency import run_in_threadpool
 
 from .schemas import PredictRequest, PredictResponse
+from .request_log import PostgresRequestLog, PredictionLog, request_features
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +59,13 @@ def create_app(model_path: str | Path | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         app.state.model = None
+        database_url = os.environ.get("DATABASE_URL", "").strip()
+        app.state.request_log = PostgresRequestLog(database_url) if database_url else None
+        if app.state.request_log is not None:
+            try:
+                await run_in_threadpool(app.state.request_log.initialize)
+            except Exception:
+                logger.error("Request log initialization failed; check PostgreSQL availability")
         path = Path(model_path or os.environ.get("MODEL_PATH", "artifact/model.joblib"))
         try:
             app.state.model = load_model(path)
@@ -66,6 +76,7 @@ def create_app(model_path: str | Path | None = None) -> FastAPI:
             yield
         finally:
             app.state.model = None
+            app.state.request_log = None
 
     app = FastAPI(
         title="Daily orders prediction API",
@@ -74,6 +85,39 @@ def create_app(model_path: str | Path | None = None) -> FastAPI:
         lifespan=lifespan,
     )
     app.state.model = None
+    app.state.request_log = None
+
+    @app.middleware("http")
+    async def log_prediction(request: Request, call_next):
+        if request.url.path != "/v1/predict":
+            return await call_next(request)
+        request.state.request_id = uuid4()
+        request.state.started = perf_counter()
+        requested_at = datetime.now(timezone.utc)
+        model = app.state.model
+        body = await request.body()
+        try:
+            response = await call_next(request)
+        except Exception:
+            logger.exception("Unhandled prediction error: request_id=%s", request.state.request_id)
+            response = JSONResponse(status_code=500, content={"detail": "Prediction failed"})
+        response.headers["X-Request-ID"] = str(request.state.request_id)
+        latency_ms = getattr(request.state, "latency_ms", (perf_counter() - request.state.started) * 1000)
+        if app.state.request_log is not None:
+            record = PredictionLog(
+                request_id=request.state.request_id,
+                requested_at=requested_at,
+                model_version=model.version if model is not None else None,
+                features=request_features(body),
+                prediction=getattr(request.state, "prediction", None) if response.status_code == 200 else None,
+                latency_ms=latency_ms,
+                status_code=response.status_code,
+            )
+            try:
+                await run_in_threadpool(app.state.request_log.write, record)
+            except Exception:
+                logger.error("Request log write failed: request_id=%s", request.state.request_id)
+        return response
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, exc: RequestValidationError):
@@ -104,9 +148,9 @@ def create_app(model_path: str | Path | None = None) -> FastAPI:
         tags=["Prediction"],
         responses={503: {"description": "Model unavailable"}},
     )
-    def predict(payload: PredictRequest):
-        started = perf_counter()
-        request_id = uuid4()
+    def predict(payload: PredictRequest, request: Request):
+        started = request.state.started
+        request_id = request.state.request_id
         model = require_model()
         values = payload.model_dump(by_alias=True)
         frame = pd.DataFrame(
@@ -121,11 +165,13 @@ def create_app(model_path: str | Path | None = None) -> FastAPI:
         except Exception:
             logger.exception("Prediction failed: request_id=%s", request_id)
             raise HTTPException(status_code=500, detail="Prediction failed") from None
+        request.state.prediction = prediction
+        request.state.latency_ms = (perf_counter() - started) * 1000
         return PredictResponse(
             prediction=prediction,
             model_version=model.version,
             request_id=request_id,
-            latency_ms=(perf_counter() - started) * 1000,
+            latency_ms=request.state.latency_ms,
         )
 
     return app

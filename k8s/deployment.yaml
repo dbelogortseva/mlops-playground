@@ -16,6 +16,17 @@ spec:
         - name: api
           image: mlops-playground:1.0
           imagePullPolicy: Never
+          env:
+            - name: MODEL_PATH
+              valueFrom:
+                configMapKeyRef:
+                  name: mlops-config
+                  key: MODEL_PATH
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: mlops-secrets
+                  key: DATABASE_URL
           ports:
             - containerPort: 8000
           startupProbe:

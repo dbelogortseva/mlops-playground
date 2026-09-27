@@ -147,6 +147,7 @@ def health():
     return {
         "status": "ok",
         "model_version": getattr(app.state, "version", "unknown"),
+        "model_path": settings.model_path,
     }
 
 

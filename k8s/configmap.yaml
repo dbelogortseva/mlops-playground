@@ -3,4 +3,4 @@ kind: ConfigMap
 metadata:
   name: mlops-config
 data:
-  MODEL_PATH: artifact/model1.joblib
+  MODEL_PATH: artifact/model.joblib

@@ -19,7 +19,7 @@ def test_predict_handles_missing_value(client, good_row):
         "/v1/predict",
         json={**good_row, "raw_price_mean": None},
     )
-    assert response.status_code == 201
+    assert response.status_code == 200
 
 
 def test_same_input_gives_same_prediction(client, good_row):

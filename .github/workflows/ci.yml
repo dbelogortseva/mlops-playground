@@ -57,7 +57,7 @@ jobs:
   deploy:
     needs: build
     if: github.event_name == 'workflow_dispatch'
-    runs-on: [self-hosted, kind]
+    runs-on: ubuntu-latest
     concurrency: {group: deploy-kind}
     timeout-minutes: 10
     permissions: {contents: read, packages: read}
@@ -78,7 +78,7 @@ jobs:
           [ -x "$B/kind" ] || curl -sSL -o "$B/kind" https://kind.sigs.k8s.io/dl/v0.33.0/kind-linux-amd64
           [ -x "$B/kubectl" ] || curl -sSL -o "$B/kubectl" https://dl.k8s.io/v1.37.0/bin/linux/amd64/kubectl
           chmod +x "$B/kind" "$B/kubectl"
-          "$B/kind" export kubeconfig --name "$KIND_CLUSTER" --internal
+          "$B/kind" create cluster --name "$KIND_CLUSTER" --wait 120s
           "$B/kubectl" get nodes
       - name: образ в кластер
         run: |

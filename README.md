@@ -1,5 +1,7 @@
 # MLOps Playground
 
+Ориентироваться в README.md можно по заголовку с номером задания.
+
 В репозитории хранится модель предсказания количества покупок электронной коммерции. 
 Модель принимает на вход **68 признаков**.
 
@@ -124,3 +126,61 @@ curl.exe --fail --silent -X POST http://127.0.0.1:8080/v1/predict -H "Content-Ty
 Причиной было отсутствие Secret mlops-secrets, на который ссылались Deployment. После создания Secret с ключами POSTGRES_PASSWORD и DATABASE_URL PostgreSQL запустился, а Deployment API успешно обновился до двух готовых реплик.
 
 В остальном всё получилось повторить почти сразу.
+
+## Задание 2.
+
+### Результаты
+
+#### 1. Пайплайн для своего сервиса
+
+Ссылка на зелёный прогон со всеми тремя job: https://github.com/dbelogortseva/mlops-playground/actions/runs/37151305931
+Ссылка на страницу пакета с образом, в теге виден sha коммита: https://github.com/dbelogortseva/mlops-playground/pkgs/container/mlops-playground/1332248128?tag=sha-16fd24c4cd8ca2da718fbe449ffdd18253b799ce
+
+#### 2. Процесс: ветка и pull request
+
+Была создана новая ветка `week2_red_test`. В файле `tests/test_smoke.py` код ошибки 200 был заменен на 201. В результате не был пройден job test.
+
+Ссылка на пулл-реквест: https://github.com/dbelogortseva/mlops-playground/pull/3.
+
+#### 3. Три красных прогона с диагнозом
+
+1. **Конфиг**
+   В файле `k8s/configmap.yaml` параметр `MODEL_PATH: artifact/model.joblib` был заменен на `MODEL_PATH: artifact/model1.joblib`.
+
+   Этап deploy выполнялся долго: максимальное время стоит 180 секунд, поэтому этап "сервис" в job deploy упал через 3 минуты после начала выполнения. По диагностике видно, что возникла ошибка с ненайденным файлом.
+
+   ```powershell
+   FileNotFoundError: [Errno 2] No such file or directory: 'artifact/model1.joblib'
+   ```
+   
+  Ссылка на красный прогон: https://github.com/dbelogortseva/mlops-playground/actions/runs/37153558266/job/111292423208
+  Ссылка на зеленый прогон: https://github.com/dbelogortseva/mlops-playground/actions/runs/37155343758/job/111297693887
+
+2. **Секрет**
+   
+    В файле `k8s/deployment.yaml` параметр `secretKeyRef: name: mlops-secrets` был заменен на `secretKeyRef: name: `mlops-secrets-wrong`.
+
+    Сломался job deploy, а именно этап "сервис". Этап "подтягиваем секреты" не сломался, потому что подтягивает секрет из `ci.yml`. 
+    Этап "сервис" отрабатывал максимальное время, то есть 3 минуты. В диагностике также видно `CreateContainerConfigError`.
+  
+    Ссылка на красный прогон: https://github.com/dbelogortseva/mlops-playground/actions/runs/37155976221/job/111299469025
+    Ссылка на зеленый прогон: https://github.com/dbelogortseva/mlops-playground/actions/runs/37156731230/job/111301730473
+
+3. **Ресурсы**
+
+    В файле `k8s/deployment.yaml` параметр `resources` был заменен на memory: `1000000000Mi`.
+    Сломался job deploy, а именно этап "сервис". Этот этап отработал 3 минуты и после этого выдал ошибку. 
+    В "диагностике" есть указание на то, что поды не запустились (у них был статус Pending), но напрямую о нехватке ресурсов это не говорит.
+
+    Ссылка на красный прогон: https://github.com/dbelogortseva/mlops-playground/actions/runs/37157284357/job/111303361752
+    Ссылка на зеленый прогон: https://github.com/dbelogortseva/mlops-playground/actions/runs/37160214846/job/111312088417
+
+4. **Семь вопросов**
+   
+   1. Кэширование build
+      
+     Первый прогон: https://github.com/dbelogortseva/mlops-playground/actions/runs/37160214846/job/111312024490 - длительность build 23 секунды
+
+     Второй прогон: https://github.com/dbelogortseva/mlops-playground/actions/runs/37160609170/job/111313175818 - длительность build 30 секунд
+   
+     Кэш использовался для слоя установки зависимостей, так как пакеты повторно не устанавливались. Также `CACHED` отмечены у копирования `pyproject.toml`, `uv.lock`, исходного кода, модели и установки самого проекта.          Значит соответствующие входные файлы и команды не изменились.

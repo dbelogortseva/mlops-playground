@@ -1,0 +1,16 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlops-api
+  namespace: mlops
+spec:
+  template:
+    spec:
+      containers:
+        - name: api
+          image: mlops-playground:registry
+          env:
+            - name: MODEL_NAME
+              value: daily-orders
+            - name: MLFLOW_TRACKING_URI
+              value: http://mlflow.mlops.svc.cluster.local:5000

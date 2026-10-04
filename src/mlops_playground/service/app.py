@@ -104,7 +104,16 @@ def body_as_json(body: bytes) -> dict:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    bundle = joblib.load(settings.model_path)
+    if settings.model_name:
+        from mlops_playground.service.model_loader import load_registered_model
+
+        bundle = load_registered_model(settings.model_name, settings.mlflow_tracking_uri)
+        app.state.model_source = "mlflow"
+        app.state.model_uri = bundle["model_uri"]
+    else:
+        bundle = joblib.load(settings.model_path)
+        app.state.model_source = "file"
+        app.state.model_uri = None
     app.state.pipeline = bundle["pipeline"]
     app.state.meta = bundle["metadata"]
     app.state.version = bundle["metadata"]["model_version"]
@@ -148,7 +157,9 @@ def health():
     return {
         "status": "ok",
         "model_version": getattr(app.state, "version", "unknown"),
-        "model_path": settings.model_path,
+        "model_path": settings.model_path if getattr(app.state, "model_source", None) == "file" else None,
+        "model_source": getattr(app.state, "model_source", "unknown"),
+        "model_uri": getattr(app.state, "model_uri", None),
     }
 
 

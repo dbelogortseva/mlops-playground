@@ -13,6 +13,8 @@ dependencies = [
     "scikit-learn>=1.6,<1.7",
     "joblib",
     "psycopg[binary]",
+    "mlflow-skinny==3.16.1",
+    "skops>=0.16,<0.17",
 ]
 
 [dependency-groups]

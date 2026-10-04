@@ -1144,6 +1144,7 @@ source = { editable = "." }
 dependencies = [
     { name = "fastapi" },
     { name = "joblib" },
+    { name = "mlflow-skinny" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "numpy", version = "2.5.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
     { name = "pandas" },
@@ -1151,6 +1152,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "scikit-learn" },
+    { name = "skops" },
     { name = "uvicorn" },
 ]
 
@@ -1172,12 +1174,14 @@ train = [
 requires-dist = [
     { name = "fastapi" },
     { name = "joblib" },
+    { name = "mlflow-skinny", specifier = "==3.16.1" },
     { name = "numpy" },
     { name = "pandas" },
     { name = "psycopg", extras = ["binary"] },
     { name = "pydantic" },
     { name = "pydantic-settings" },
     { name = "scikit-learn", specifier = ">=1.6,<1.7" },
+    { name = "skops", specifier = ">=0.16,<0.17" },
     { name = "uvicorn" },
 ]
 

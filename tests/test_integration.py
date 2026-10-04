@@ -17,6 +17,7 @@ pytestmark = [
 def test_prediction_is_logged(client, good_row):
     response = client.post("/v1/predict", json=good_row)
     body = response.json()
+    assert response.headers["X-Request-ID"] == body["request_id"]
 
     with psycopg.connect(DATABASE_URL) as conn:
         row = conn.execute(
@@ -34,18 +35,22 @@ def test_prediction_is_logged(client, good_row):
 
 
 def test_validation_error_is_logged(client, good_row):
+    invalid_row = {**good_row, "hacker_field": 1}
     response = client.post(
         "/v1/predict",
-        json={**good_row, "hacker_field": 1},
+        json=invalid_row,
     )
     assert response.status_code == 422
+    request_id = response.headers["X-Request-ID"]
 
     with psycopg.connect(DATABASE_URL) as conn:
         row = conn.execute(
             "SELECT features, prediction, status_code FROM predictions "
-            "ORDER BY ts DESC LIMIT 1",
+            "WHERE request_id = %s",
+            (request_id,),
         ).fetchone()
 
-    assert row[0]["hacker_field"] == 1
+    assert row is not None
+    assert row[0] == invalid_row
     assert row[1] is None
     assert row[2] == 422

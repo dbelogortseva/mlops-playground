@@ -7,7 +7,7 @@ def test_predict_smoke(client, good_row):
     body = response.json()
     assert isinstance(body["prediction"], float)
     assert math.isfinite(body["prediction"])
-    assert body["prediction"] >= 0
+    assert 0 <= body["prediction"] <= 11621
     assert isinstance(body["model_version"], str)
     assert isinstance(body["request_id"], str)
     assert isinstance(body["latency_ms"], float)

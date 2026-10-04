@@ -125,6 +125,7 @@ async def log_prediction(request: Request, call_next):
     request.state.started_at = time.perf_counter()
     features = body_as_json(await request.body())
     response = await call_next(request)
+    response.headers["X-Request-ID"] = request.state.request_id
     latency_ms = getattr(
         request.state,
         "latency_ms",

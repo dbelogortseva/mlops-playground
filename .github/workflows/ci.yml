@@ -117,7 +117,7 @@ jobs:
           curl --fail --silent --show-error -X POST http://127.0.0.1:8080/v1/predict \
             -H "Content-Type: application/json" -d @good.json \
             | tee pred.json \
-            | python3 -c 'import json,math,sys; r=json.load(sys.stdin); assert math.isfinite(r["prediction"]) and 0 <= r["prediction"], r'
+            | python3 -c 'import json,math,sys; r=json.load(sys.stdin); assert math.isfinite(r["prediction"]) and 0 <= r["prediction"] <= 11621, r'
 
           sleep 2
           RID=$(python3 -c 'import json; print(json.load(open("pred.json"))["request_id"])')
